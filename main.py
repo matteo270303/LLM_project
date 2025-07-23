@@ -1,6 +1,8 @@
 import os
 import Tokenizer
 import DataLoader
+import Embedding
+import torch.nn as nn
 
 verdict_path = os.path.join("data", "verdict.txt")
 
@@ -19,6 +21,7 @@ print(integer)
 print(tokenizer.decode(integer))
 print("Numero di token:", len(integer))
 
+# Creo il DataLoader
 data_loader = DataLoader.CustomDataset.create_dataloader(
     txt=text,
     batch_size=8,
@@ -29,9 +32,20 @@ data_loader = DataLoader.CustomDataset.create_dataloader(
 
 data_iter = iter(data_loader)
 batch = next(data_iter)
-print("Input IDs:", batch['input_ids'])
-print("Target IDs:", batch['target_ids'])
+input_ids = batch['input_ids']
+target_ids = batch['target_ids']
+print("Token id input:", input_ids)
+print("Input shape:", input_ids.shape)
 
-'''second_batch = next(data_iter)
-print("Second Input IDs:", second_batch['input_ids'])
-print("Second Target IDs:", second_batch['target_ids'])'''
+# Stampo la lunghezza del vocabolario
+vocab_length = tokenizer.vocab_len()
+print("Lunghezza del vocabolario:", vocab_length)
+
+# creazione del livello di embedding in pytorch
+embedding = Embedding.Embedding()
+embedding_layer = embedding.create_embedding(vocab_length, 256)
+embedding_token_layer_positional = embedding.create_token_embedding_layer_positional(vocab_length, 256, max_length=4)
+
+# Applica l'embedding agli input_ids per ottenere un torch tensor
+embedded_tokens = embedding_layer(input_ids)
+print("Embedded tokens shape:", embedded_tokens.shape)
