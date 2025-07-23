@@ -1,32 +1,28 @@
 import os
-import Tokenizer
-import DataLoader
-import Embedding
+from Tokenizer import Tokenizer
+from DataLoader import CustomDataset
+from Embedding import Embedding
 import torch.nn as nn
+from Attention import SelfAttention, MultiHeadAttentionWrapper, MultiHeadAttention
 
 verdict_path = os.path.join("data", "verdict.txt")
 
 with open (verdict_path, "r", encoding="UTF-8") as file:
     text = file.read()
 
-
-tokenizer = Tokenizer.Tokenizer(text)
+tokenizer = Tokenizer(text)
 
 # Effettuo l'encoding in interi
 integer = tokenizer.encode()
 
-print(integer)
-
-# Stampo la decodifica della lista degli interi
-print(tokenizer.decode(integer))
 print("Numero di token:", len(integer))
 
 # Creo il DataLoader
-data_loader = DataLoader.CustomDataset.create_dataloader(
+data_loader = CustomDataset.create_dataloader(
     txt=text,
-    batch_size=8,
+    batch_size=128,
     shuffle=False,
-    max_length=4,
+    max_length=1024,
     stride=4
 )
 
@@ -42,10 +38,26 @@ vocab_length = tokenizer.vocab_len()
 print("Lunghezza del vocabolario:", vocab_length)
 
 # creazione del livello di embedding in pytorch
-embedding = Embedding.Embedding()
-embedding_layer = embedding.create_embedding(vocab_length, 256)
-embedding_token_layer_positional = embedding.create_token_embedding_layer_positional(vocab_length, 256, max_length=4)
+embedding = Embedding()
+embedding_layer = embedding.create_embedding(vocab_length, 768)
+embedding_token_layer_positional = embedding.create_token_embedding_layer_positional(vocab_length, 768, max_length=1024)
+input_embedding = embedding.create_input_embedding(embedding_layer, embedding_token_layer_positional, input_ids)
 
-# Applica l'embedding agli input_ids per ottenere un torch tensor
-embedded_tokens = embedding_layer(input_ids)
-print("Embedded tokens shape:", embedded_tokens.shape)
+# Processo di Multi-Head Attention
+multi_head_attention = MultiHeadAttention(
+    d_in=768,  # Dimensione dell'input
+    d_out=768,  # Dimensione dell'output totale
+    num_heads=12,  # Numero di teste
+    context_length=input_embedding.shape[1],  # Lunghezza della sequenza
+    dropout=0.1,  # Dropout
+    qkv_bias=True  # Bias per Q, K, V
+)
+
+# Passa l'input embedding attraverso il livello di Multi-Head Attention
+attention_output, attention_weights = multi_head_attention(input_embedding)
+
+# Stampa i risultati
+print("Output della Multi-Head Attention:", attention_output)
+print("Shape dell'output della Multi-Head Attention:", attention_output.shape)
+print("Pesi di attenzione della Multi-Head Attention:", attention_weights)
+print("Shape dei pesi di attenzione:", attention_weights.shape)
