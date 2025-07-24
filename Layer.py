@@ -39,58 +39,67 @@ class FeedForward(nn.Module):
         return self.layer(x)
     
 class MultiHeadAttention(nn.Module):
-    def __init__(self, d_in, d_out, num_heads, context_length, dropout=0.4, qkv_bias=False):
-        super().__init__()
-        #assert self.head_dim * num_heads == d_out, "d_out must be divisible by num_heads"
 
-        self.num_heads = num_heads
+    def __init__(self, d_in, d_out, num_heads, context_length, dropout=0.4, qkv_bias=False, is_causal=False):
+        super().__init__()
+        # 1. Assert corretto per la robustezza
+        assert d_out % num_heads == 0, "d_out must be divisible by num_heads"
+
         self.d_out = d_out
+        self.num_heads = num_heads
         self.head_dim = d_out // num_heads
+        self.is_causal = is_causal 
+
         self.W_query = nn.Linear(d_in, d_out, bias=qkv_bias)
         self.W_key = nn.Linear(d_in, d_out, bias=qkv_bias)
         self.W_value = nn.Linear(d_in, d_out, bias=qkv_bias)
+        self.out_proj = nn.Linear(d_out, d_out) 
         self.dropout = nn.Dropout(dropout)
-        self.out_proj = nn.Linear(d_out, d_out, bias=qkv_bias)
-        self.register_buffer('mask',
-                             torch.tril(torch.ones(context_length, context_length),
-                                        diagonal=1))
+
+        if self.is_causal:
+            # La maschera viene creata una sola volta
+            self.register_buffer(
+                'mask',
+                torch.tril(torch.ones(context_length, context_length))
+            )
 
     def forward(self, x):
+        # Controlla se l'input è una tupla e prendi solo il primo elemento
+        if isinstance(x, tuple):
+            x = x[0]
         b, num_token, d_in = x.shape
-        keys = self.W_key(x)
-        queries = self.W_query(x)
-        values = self.W_value(x)
 
-        # Reshape for multi-head attention
-        keys = keys.view(b, num_token, self.num_heads, self.head_dim).transpose(1, 2)
+        queries = self.W_query(x) # [b, num_token, d_out]
+        keys = self.W_key(x)      # [b, num_token, d_out]
+        values = self.W_value(x)  # [b, num_token, d_out]
+
+        # Riorganizzazione per multi-head
         queries = queries.view(b, num_token, self.num_heads, self.head_dim).transpose(1, 2)
+        keys = keys.view(b, num_token, self.num_heads, self.head_dim).transpose(1, 2)
         values = values.view(b, num_token, self.num_heads, self.head_dim).transpose(1, 2)
+        # Ora le shape sono [b, num_heads, num_token, head_dim]
 
-        # Compute attention scores
-        att_scores = torch.matmul(queries, keys.transpose(2, 3))  # [batch_size, num_heads, seq_len, seq_len]
+        # Calcolo degli score di attenzione
+        att_scores = torch.matmul(queries, keys.transpose(-2, -1)) # [b, num_heads, num_token, num_token]
 
-        # Apply the mask using torch.tril
-        mask = torch.tril(torch.ones(num_token, num_token, device=att_scores.device))  # Lower triangular mask
-        mask = mask.unsqueeze(0).unsqueeze(1)  # [1, 1, seq_len, seq_len]
-        att_scores = att_scores.masked_fill(mask == 0, float('-inf'))  # Mask invalid positions
+        if self.is_causal:
+            att_scores = att_scores.masked_fill(
+                self.mask[:num_token, :num_token] == 0, float('-inf')
+            )
 
-        # Debugging: Check the mask
-        print("Mask applied to attention scores:", mask)
-
-        # Apply softmax to normalize scores
-        att_weights = softmax(att_scores / self.head_dim**0.5, dim=-1)
+        # Normalizzazione con softmax
+        att_weights = nn.functional.softmax(att_scores / (self.head_dim**0.5), dim=-1)
         att_weights = self.dropout(att_weights)
 
-        # Compute context vectors
-        context_vec = torch.matmul(att_weights, values).transpose(1, 2)  # [batch_size, seq_len, num_heads, head_dim]
-        context_vec = context_vec.contiguous().view(b, num_token, self.d_out)  # [batch_size, seq_len, d_out]
+        # Calcolo dei context vectors
+        context_vec = torch.matmul(att_weights, values) # [b, num_heads, num_token, head_dim]
 
-        # Apply final linear projection
+        # Riconcatenazione delle teste
+        context_vec = context_vec.transpose(1, 2).contiguous() # [b, num_token, num_heads, head_dim]
+        context_vec = context_vec.view(b, num_token, self.d_out) # [b, num_token, d_out]
+
+        # Proiezione finale
         output = self.out_proj(context_vec)
-
-        # Debugging: Print intermediate values
-        print("Attention scores (after masking):", att_scores)
-        print("Attention weights (after softmax):", att_weights)
 
         return output, att_weights
 
@@ -103,6 +112,9 @@ class TransformerLayer(nn.Module):
         self.ffn = FeedForward(d_in, d_out)
 
     def forward(self, x):
+        if isinstance(x, tuple):
+            x = x[0]
+        print(x.shape)
         att_output, att_weights = self.attention(x)
         x = self.norm1(x + att_output)  # Residual connection
         ffn_output = self.ffn(x)

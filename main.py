@@ -1,10 +1,12 @@
 import os
+
+import torch
 from Tokenizer import Tokenizer
 from DataLoader import CustomDataset
 from Embedding import Embedding
 import torch.nn as nn
-from Layer import MultiHeadAttention
-from Layer import TransformerLayer
+from Model import GPTModel
+from config import GPT_CONFIG_124M
 
 verdict_path = os.path.join("data", "verdict.txt")
 
@@ -23,7 +25,7 @@ data_loader = CustomDataset.create_dataloader(
     txt=text,
     batch_size=32,
     shuffle=False,
-    max_length=1024,
+    max_length=512,
     stride=4
 )
 
@@ -41,7 +43,7 @@ print("Lunghezza del vocabolario:", vocab_length)
 # creazione del livello di embedding in pytorch
 embedding = Embedding()
 embedding_layer = embedding.create_embedding(vocab_length, 768)
-embedding_token_layer_positional = embedding.create_token_embedding_layer_positional(vocab_length, 768, max_length=1024)
+embedding_token_layer_positional = embedding.create_token_embedding_layer_positional(vocab_length, 768, max_length=512)
 input_embedding = embedding.create_input_embedding(embedding_layer, embedding_token_layer_positional, input_ids)
 
 '''# Processo di Multi-Head Attention
@@ -63,7 +65,7 @@ print("Shape dell'output della Multi-Head Attention:", attention_output.shape)
 print("Pesi di attenzione della Multi-Head Attention:", attention_weights)
 print("Shape dei pesi di attenzione:", attention_weights.shape)'''
 
-transformer_layer = TransformerLayer(
+'''transformer_layer = TransformerLayer(
     d_in=768,  # Dimensione dell'input
     d_out=768,  # Dimensione dell'output
     num_heads=1,  # Numero di teste
@@ -79,4 +81,14 @@ output, attention_weights = transformer_layer(input_embedding)
 print("Output del Transformer Layer:", output)
 print("Shape dell'output del Transformer Layer:", output.shape)
 print("Pesi di attenzione del Transformer Layer:", attention_weights)
-print("Shape dei pesi di attenzione:", attention_weights.shape)
+print("Shape dei pesi di attenzione:", attention_weights.shape)'''
+
+torch.manual_seed(123)
+model = GPTModel(GPT_CONFIG_124M)
+output = model(input_ids)
+print("Output del modello GPT:", output)
+print("Shape dell'output del modello GPT:", output.shape)
+print(output)
+
+num_params = model.num_parameters()
+print("Numero di parametri del modello GPT:", num_params)
