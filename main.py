@@ -3,7 +3,8 @@ from Tokenizer import Tokenizer
 from DataLoader import CustomDataset
 from Embedding import Embedding
 import torch.nn as nn
-from Attention import SelfAttention, MultiHeadAttentionWrapper, MultiHeadAttention
+from Layer import MultiHeadAttention
+from Layer import TransformerLayer
 
 verdict_path = os.path.join("data", "verdict.txt")
 
@@ -20,7 +21,7 @@ print("Numero di token:", len(integer))
 # Creo il DataLoader
 data_loader = CustomDataset.create_dataloader(
     txt=text,
-    batch_size=128,
+    batch_size=32,
     shuffle=False,
     max_length=1024,
     stride=4
@@ -43,13 +44,13 @@ embedding_layer = embedding.create_embedding(vocab_length, 768)
 embedding_token_layer_positional = embedding.create_token_embedding_layer_positional(vocab_length, 768, max_length=1024)
 input_embedding = embedding.create_input_embedding(embedding_layer, embedding_token_layer_positional, input_ids)
 
-# Processo di Multi-Head Attention
+'''# Processo di Multi-Head Attention
 multi_head_attention = MultiHeadAttention(
     d_in=768,  # Dimensione dell'input
     d_out=768,  # Dimensione dell'output totale
-    num_heads=12,  # Numero di teste
+    num_heads=1,  # Numero di teste
     context_length=input_embedding.shape[1],  # Lunghezza della sequenza
-    dropout=0.1,  # Dropout
+    dropout=0.1, 
     qkv_bias=True  # Bias per Q, K, V
 )
 
@@ -60,4 +61,22 @@ attention_output, attention_weights = multi_head_attention(input_embedding)
 print("Output della Multi-Head Attention:", attention_output)
 print("Shape dell'output della Multi-Head Attention:", attention_output.shape)
 print("Pesi di attenzione della Multi-Head Attention:", attention_weights)
+print("Shape dei pesi di attenzione:", attention_weights.shape)'''
+
+transformer_layer = TransformerLayer(
+    d_in=768,  # Dimensione dell'input
+    d_out=768,  # Dimensione dell'output
+    num_heads=1,  # Numero di teste
+    context_length=input_embedding.shape[1],  # Lunghezza della sequenza
+    dropout=0.1,  # Dropout
+    qkv_bias=True  # Bias per Q, K, V
+)
+
+# Passa l'input embedding attraverso il Transformer Layer
+output, attention_weights = transformer_layer(input_embedding)
+
+# Stampa i risultati
+print("Output del Transformer Layer:", output)
+print("Shape dell'output del Transformer Layer:", output.shape)
+print("Pesi di attenzione del Transformer Layer:", attention_weights)
 print("Shape dei pesi di attenzione:", attention_weights.shape)
