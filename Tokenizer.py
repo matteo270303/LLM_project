@@ -6,10 +6,9 @@ class Tokenizer:
         self.tokens = []
         self.tokenizer = tiktoken.get_encoding("gpt2") #crea l'istanza di tokenizzazione utilizzando il modello GPT-2
 
-    def encode(self):
-        # Effettua l'encoding del testo in interi
-        self.tokens = self.tokenizer.encode(self.text, allowed_special={"<|endoftext|>"})
-        return self.tokens
+    def encode(self, text_to_encode=None):
+        text = self.text if text_to_encode is None else text_to_encode
+        return self.tokenizer.encode(text, allowed_special={"<|endoftext|>"})
 
     def decode(self, integer_list):
         # Decodifica la lista degli interi in testo

@@ -1,5 +1,5 @@
 import os
-
+from Function import generate_text
 import torch
 from Tokenizer import Tokenizer
 from DataLoader import CustomDataset
@@ -92,3 +92,17 @@ print(output)
 
 num_params = model.num_parameters()
 print("Numero di parametri del modello GPT:", num_params)
+
+#Esempio di generazione del testo
+input_text = "Hello, I am"
+encoded_input = tokenizer.encode(input_text)
+input_tensor = torch.tensor(encoded_input).unsqueeze(0)  
+
+print("Encoding testo di input:", encoded_input)
+print("Input tensor per la generazione:", input_tensor)
+
+model.eval()
+out = generate_text(model = model, idx = input_tensor, max_new_tokens=10, context_length=GPT_CONFIG_124M["context_length"])
+
+print("Testo generato:", out)
+print("Testo generato decodificato:", tokenizer.decode(out.squeeze(0).tolist()))
